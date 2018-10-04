@@ -2,10 +2,10 @@
 
 import rospy
 
-#from nmea_msgs.msg import Sentence
-from rtcm_msgs.msg import Message
+from nmea_msgs.msg import Sentence
+#from rtcm_msgs.msg import Message
 
-from httplib import HTTPConnection
+import urllib2
 from base64 import b64encode
 from threading import Thread
 
@@ -15,22 +15,23 @@ class ntripconnect(Thread):
         self.ntc = ntc
         self.stop = False
 
-    def run(self):
-        headers = {
-            'Ntrip-Version': 'Ntrip/2.0',
-            'User-Agent': 'NTRIP ntrip_ros',
-            'Connection': 'close',
-            'Authorization': 'Basic ' + b64encode(self.ntc.ntrip_user + ':' + self.ntc.ntrip_pass)
-        }
-        connection = HTTPConnection(self.ntc.ntrip_server)
-        connection.request('GET', '/'+self.ntc.ntrip_stream, self.ntc.nmea_gga, headers)
-        
-        response = connection.getresponse()
-        if response.status != 200: raise Exception("blah")
+#    def run(self):
+#        headers = {
+#            'Ntrip-Version': 'Ntrip/2.0',
+#            'User-Agent': 'NTRIP ntrip_ros',
+#            'Connection': 'close',
+#            'Authorization': 'Basic ' + b64encode(self.ntc.ntrip_user + ':' + self.ntc.ntrip_pass)
+#        }
+
+
+        req = urllib2.Request(self.ntc.ntrip_server)
+        response = urllib2.urlopen(req)
+#        if response.status != 200: raise Exception("blah")
         buf = ""
-        rmsg = Message()
+        rmsg = Sentence()
         while not self.stop:
-            data = response.read(100)
+            data = response.read()
+            print(data)
             pos = data.find('\r\n')
             if pos != -1:
                 rmsg.message = buf + data[:pos]
@@ -46,17 +47,23 @@ class ntripclient:
     def __init__(self):
         rospy.init_node('ntripclient', anonymous=True)
 
-        self.rtcm_topic = rospy.get_param('~rtcm_topic', 'rtcm')
+#        self.rtcm_topic = rospy.get_param('~rtcm_topic', 'rtcm')
         self.nmea_topic = rospy.get_param('~nmea_topic', 'nmea')
 
-        self.ntrip_server = rospy.get_param('~ntrip_server')
-        self.ntrip_user = rospy.get_param('~ntrip_user')
-        self.ntrip_pass = rospy.get_param('~ntrip_pass')
-        self.ntrip_stream = rospy.get_param('~ntrip_stream')
-        self.nmea_gga = rospy.get_param('~nmea_gga')
+#        self.ntrip_server = rospy.get_param('~ntrip_server')
+#        self.ntrip_user = rospy.get_param('~ntrip_user')
+#        self.ntrip_pass = rospy.get_param('~ntrip_pass')
+#        self.ntrip_stream = rospy.get_param('~ntrip_stream')
+#        self.nmea_gga = rospy.get_param('~nmea_gga')
 
-        self.pub = rospy.Publisher(self.rtcm_topic, Message, queue_size=10)
+        self.ntrip_server = 'http://www.rtk2go.com:2101'
+        self.ntrip_stream = ''
+        self.nmea_gga = 'u-blox'
 
+        
+#        self.pub = rospy.Publisher(self.rtcm_topic, Message, queue_size=10)
+        self.pub = rospy.Publisher(self.nmea_topic, Sentence, queue_size=10)
+        
         self.connection = None
         self.connection = ntripconnect(self)
         self.connection.start()
